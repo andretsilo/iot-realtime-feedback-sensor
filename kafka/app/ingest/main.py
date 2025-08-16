@@ -22,4 +22,4 @@ async def root(feedback: SensorFeedback):
     if (timeZoneMatch == None):
         raise HTTPException(status_code=400, detail="Time zone not formatted correctly")
 
-    await stream_to_kafka()
+    await stream_to_kafka(feedback)
