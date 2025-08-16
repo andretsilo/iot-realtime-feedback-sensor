@@ -1,8 +1,6 @@
 from pydantic import BaseModel, Field
 from enum import IntEnum
 
-# TODO add validators for generationTime and timeZone
-
 class FeedbackEnum(IntEnum):
     bad = 1
     mid = 2
