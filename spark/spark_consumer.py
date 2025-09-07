@@ -12,7 +12,6 @@ def create_keyspace(session):
     """)
 
     logging.info("Keyspace created successfully")
-    print("ok keyspace")
 
 def create_table(session):
     session.execute("""
@@ -61,7 +60,7 @@ def create_kafka_connection(spark: SparkSession):
             .load()
         logging.info("kafka dataframe created successfully")
     except Exception as e:
-        logging.warning("Kafka dataframe could not be created: " + str(e))
+        logging.warning(f"Kafka dataframe could not be created: {e}")
 
     return spark_df
 
@@ -75,9 +74,9 @@ def create_spark_session():
             .config("spark.cassandra.connection.host", "localhost") \
             .getOrCreate()
         spark.sparkContext.setLogLevel("ERROR")
-        logging.info("Session created succesfully: " + str(spark))
+        logging.info(f"Session created succesfully: {spark}")
     except Exception as e:
-        logging.error("Could not create spark session: " + str(e))
+        logging.error(f"Could not create spark session: {e}")
 
     return spark
 
