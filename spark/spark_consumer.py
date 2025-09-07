@@ -5,6 +5,37 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType, ByteType
 
+def create_keyspace(session):
+    session.execute("""
+        CREATE KEYSPACE IF NOT EXISTS feedback_streams
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
+    """)
+
+    logging.info("Keyspace created successfully")
+    print("ok keyspace")
+
+def create_table(session):
+    session.execute("""
+        CREATE TABLE IF NOT EXISTS feedback_streams.feedbacks (
+            sensor_id TEXT,
+            feedback TEXT,
+            generation_time TEXT,
+            time_zone TEXT,
+            PRIMARY KEY (sensor_id, generation_time, time_zone));
+    """)
+
+    logging.info("Table created successfully")
+
+def create_cassandra_connection():
+    cas_session = None
+    try:
+        cluster = Cluster(['localhost'])
+        cas_session = cluster.connect()
+    except Exception as e:
+        logging.error(f"Could not create cassandra connection: {e}")
+
+    return cas_session
+
 def create_df_from_kafka(spark_df):
     schema = StructType([
         StructField("sensorId", StringType(), False),
@@ -13,7 +44,7 @@ def create_df_from_kafka(spark_df):
         StructField("timeZone", StringType(), False)
     ])
 
-    selected_df = spark_df.selectExpr("CAST(value AS STRING)") \
+    selected_df = spark_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
         .select(from_json(col('value'), schema).alias('data')).select("data.*")
     
     return selected_df
@@ -55,6 +86,21 @@ if __name__ == "__main__":
 
     if spark_session is not None:
         spark_df = create_kafka_connection(spark_session)
+        logging.info("spark_df: {spark_df}")
         df = create_df_from_kafka(spark_df)
-        logging.info(f"Found data: {df}")
+        session = create_cassandra_connection()
+
+        if session is not None:
+            create_keyspace(session)
+            create_table(session)
+
+            logging.info("Streaming towards db starting")
+
+            streaming_query = (df.writeStream.format("org.apache.spark.sql.cassandra")
+                               .option('checkpointLocation', '/tmp/checkpoint')
+                               .option('keyspace', 'feedback_streams')
+                               .option('table', 'feedbacks')
+                               .start())
+            
+            streaming_query.awaitTermination()
 
